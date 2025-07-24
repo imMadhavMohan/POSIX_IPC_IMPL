@@ -1,0 +1,245 @@
+Write to Fifo_Pipe: (named_Pipe)
+const char* pathname = "/tmp/myfifo"; 
+int mkfifo(const char *pathname, mode_t mode); # Create FIFO using mkfifo()
+
+mkfifo("/tmp/myfifo", 0666); // 2ns arg mode
+int fd = open("/tmp/myfifo", O_WRONLY);  // Open FIFO for reading or writing or O_RDONLY or O_RDWR
+
+Write/Read using standard file I/O
+write(fd, "Hello", 5);
+read(fd, buffer, sizeof(buffer));
+close(fd);
+
+Read from Pipe:
+const char* pathname = "/tmp/myfifo"; 
+
+const char buffer[100];
+
+int fd = open("/tmp/myfifo", O_WRONLY);  // Open FIFO for reading or writing or O_RDONLY
+
+read(fd, buffer, sizeof(buffer));
+printf("Received: %s\n", buffer);
+close(fd);
+
+Unnamed PIPE: Unlike FIFO pipes (named pipes), unnamed pipes don’t exist in the filesystem 
+int pipe(int pipefd[2]); # create pipe:; blocking read & write until not done
+// read end & write end
+int P1[2]; // Pipe 1 for parent-to-child communication
+int P2[2]; // Pipe 2 for child-to-parent communication
+
+while(1): pipe to be created again & again
+pipe(P1); // -1 on error
+pipe(P2);
+
+int pid = fork(); // Fork a child process
+// P1[0] & P2[0] are for read end & P1[1] & P2[1] are for write end
+if (pid == 0) { // Child Process : After fork(), both the parent and child run "simultaneously"
+close(P1[0]);
+close(P2[1]);
+char buffer[100];
+
+const char* str = "Madhav";
+read(P1[1], buffer, sizeof(buffer));
+write(P2[0], str, sizeof(str));
+
+close(P2[0]);
+close(P1[1]);
+}else if(pid>1){
+close(P2[0]);
+close(P1[1]);
+char buffer[100];
+
+const char* str = "Madhav!!";
+read(P2[1], buffer, sizeof(buffer));
+write(P1[0], str, sizeof(str));
+
+close(P1[0]);
+close(P2[1]);
+}
+
+
+
+
+Shared Memory:
+Producer: 
+const char* SHM_NAME = "/myshm";
+const int SHM_SIZE = 1024;
+const char* SEM_NAME = "mysem";
+int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666); // Create or open shared memory object
+
+// memory-map
+char* ptr = (char*) mmap(NULL, SHM_SIZE, PROT_WRITE, MAP_SHARED, fd, 0); //NULL:Starting Addr, PROT_WRITE:Writable, MAP_SHARED: Changes are Sharable bw process, 0: offset w.r.t the startAddr from where read/write operations to be started
+## The return value ptr is a pointer to the mapped memory region, so a virtual Addr will be given to the process.
+
+// Create or open semaphore
+    sem_t* sem = sem_open(SEM_NAME, O_CREAT, 0666, 1); // last Arg: 1, means semaphore is Available, once wait is called it becomes unavailable & val = 0, then to re-access we've to call sem_post(sem)
+    sem_wait(sem);
+    strcpy(ptr, message);// Critical section
+    sem_post(sem);
+
+// un-map Memory
+munmap(ptr, SHM_SIZE);
+close(fd);
+sem_close(sem);	
+
+
+Consumer:
+int fd = shm_open(SHM_NAME, O_RDONLY, 0666); // shm will open
+// memory mapping
+char* ptr = (char*) mmap(NULL, SHM_SIZE, PROT_READ, MAP_PRIVATE, fd, 0); // returns pointer to mapped memory Addr									 
+
+// Open semaphore
+sem_t* sem = sem_open(SEM_NAME, 0666, 0); // 0: Oflag open an existing one
+
+// memory_unmap
+munmap(ptr, SHM_SIZE);
+close(fd);
+sem_close(sem);	
+
+// unlink_semaphore: remove from the File System
+sem_unlink(SEM_NAME);
+
+
+
+MessageQ:
+Producer:
+const int MSG_SIZE = 1024; const int MAX_MSG = 3;
+
+struct mq_attr msgq_attr;
+msgq_attr.mq_flags = 0; // Default behavior (blocking)
+msgq_attr.mq_maxmsg = MAX_MSG; // Maximum number of messages in the queue
+msgq_attr.mq_msgsize = MAX_MSG_SIZE; // Maximum size of a message
+msgq_attr.mq_curmsgs = 0; // Current number of messages in the queue (system sets this)
+
+int mq = mq_open(QUEUE_NAME, O_CREAT | O_WRONLY, 0666, &msgq_attr); // FD
+mq_send(mq, message, strlen(message) + 1, priority);
+mq_close(mq);
+
+Consumer:
+int mq = mq_open(QUEUE_NAME, O_CREAT | O_WRONLY, 0666, &msgq_attr); // FD
+int bytes_read = mq_receive(mq, buffer, MAX_MSG_SIZE, &priority); 
+if (bytes_read >= 0) {
+            buffer[bytes_read] = '\0';  // Null-terminate the received message
+            cout << "Received: " << buffer << " | Priority: " << priority << endl;
+        }
+
+mq_close(mq);
+mq_unlink(QUEUE_NAME); // remove from File_System
+
+
+
+Signal_Handling:
+Basic_Signal:
+void handle_signal(int signal) {
+    printf("Received Signal: %d\n", signal);        
+}
+signal(SIGINT, handle_signal); //  SIGINT = ctrl+c = 2
+
+printf("Running... Press Ctrl+C to send SIGINT.\n");
+while (1) {
+  sleep(1);  // Keep the process running
+}
+
+
+/***************************************/
+// Simple signal handler
+void handler(int sig) {
+    printf("Received signal: %d\n", sig);
+}
+Adv_Sig_handling:
+struct sigaction sa;
+sa.sa_handler = handler;  // Assigning handler function
+sa.sa_flags = 0; 
+
+sigaction(SIGINT, &sa, NULL);  // Handle SIGINT (Ctrl+C)
+while (1) sleep(1);  // Keep running
+
+/**************************************/
+Adv_Sig_Handling_1:
+void segfault_handler(int sig) {    
+    printf("");
+    exit(1);  // Exit after handling
+}
+
+struct sigaction sa;
+sa.sa_flags = SA_SIGINFO;  // Use sa_sigaction instead of sa_handler
+sa.sa_sigaction = segfault_handler; // for SegFault handling:for Adv sigHandlling
+   or
+sa.sa_handler = segfault_handler; // for SegFault handling
+
+sigaction(SIGSEGV, &sa, NULL);  // Register signal handler for SIGSEGV: 11; NULL: PrevSignal_Handler Obj
+
+printf("Causing segmentation fault...\n");
+int *ptr ;  // Null pointer or keep uninitialized 
+*ptr = 42;  // Writing to NULL causes SIGSEGV
+
+
+
+Zombie_Process:
+
+How a Zombie Process Occurs:
+Fork: A parent process creates a child using fork().
+
+Child terminates: The child process finishes its work and terminates. However, it remains in the process table as a zombie because the parent hasn't yet acknowledged the termination.
+
+Parent doesn’t call wait(): The parent process hasn't collected the exit status using wait() or waitpid(), so the child process remains in the zombie state.
+
+
+// Signal handler for SIGCHLD
+void handle_sigchld(int sig) {    
+    sleep(15);
+    while (waitpid(-1, NULL, WNOHANG) > 0) {
+        printf("Zombie process reaped!\n");
+    }
+}
+
+{
+struct sigaction sa;
+    sa.sa_handler = handle_sigchld;   // Set handler for SIGCHLD
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;  // Restart syscalls, ignore stopped children
+    sigemptyset(&sa.sa_mask);  // No additional signals blocked
+sigaction(SIGCHLD, &sa, NULL); // 17 sig_id
+
+pid_t pid = fork();
+
+    if (pid == 0) {
+        // Child process
+        printf("Child process (PID: %d) exiting...\n", getpid());
+        exit(0);  // Child exits, becoming a zombie temporarily
+    } else {
+        // Parent process
+        printf("Parent process (PID: %d), child PID: %d\n", getpid(), pid);
+        
+        // Sleep to allow time to observe the zombie
+        sleep(10);
+
+        // Check child status using `ps`
+        printf("Run 'ps aux | grep %d' to check if zombie exists\n", pid);
+
+        // Sleep to observe that SIGCHLD has handled the zombie
+        sleep(5);
+
+        printf("Exiting parent process.\n");
+    }
+}
+
+mmohan@mohan:~/Templates$ ./zombie &
+[1] 10972
+Parent process (PID: 10972), child PID: 10974
+Child process (PID: 10974) exiting...
+mmohan@mohan:~/Templates$ ps
+    PID TTY          TIME CMD
+   2872 pts/1    00:00:00 bash
+  10972 pts/1    00:00:00 zombie
+  10974 pts/1    00:00:00 zombie <defunct>
+  10990 pts/1    00:00:00 ps
+mmohan@mohan:~/Templates$ ^C
+mmohan@mohan:~/Templates$ ^C
+mmohan@mohan:~/Templates$ Zombie process reaped!
+Run 'ps aux | grep 10974' to check if zombie exists
+Exiting parent process.
+
+[1]+  Done                    ./zombie
+mmohan@mohan:~/Templates$ 
+
+
