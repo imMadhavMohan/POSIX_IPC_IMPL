@@ -242,4 +242,73 @@ Exiting parent process.
 [1]+  Done                    ./zombie
 mmohan@mohan:~/Templates$ 
 
+*The primary purpose of SIGINT is to notify a process that the user has requested an interruption. 'ctrl+c'
+*SIGTERM is more forceful than SIGINT but still gives a process the opportunity to perform clean-up tasks before it ends.  
+ It allows the process to catch the signal and manage its termination elegantly – saving data or finishing essential tasks. Eg. $ kill 1234
+*SIGKILL: The last resort, if a process does not respond to the SIGTERM signal, or is stuck in an endless loop and not releasing the resources? 
+  This is where SIGKILL comes in. SIGKILL, as the name suggests, kills the process immediately.
 
+socket:
+client:
+fd = open()
+connect()
+recv()
+send()
+close()
+
+server:
+fd = open()
+bind();
+listen();
+accept();
+send()
+close()
+#define PORT 8080
+
+main(){
+struct sockaddr_in servAddr,clientAddr;
+int clintAddr = sizeof(clientAddr);
+
+int sfd = socket(AF_INET, SOCK_STREAM, 0); // AF_INET6; 0: let os decide, IPPROTO_TCP/UDP
+
+servAddr.sin_family = AF_INET;
+servAddr.sin_addr = INADDR_ANY; // Accept from any IP_ADDR
+servAddr.sin_port = htons(PORT); // nw order / BigIndian
+
+bind(sfd, (sockaddr_in*)&servAddr,sizeof(servAddr));
+
+listen(sfd, 5); // 5 connection
+
+int cfd = accept(sfd, (clientAddr*)&clientAddr, sizeof(clientAddr));
+char msg[10];
+while(1){
+int read_b = recv(cfd, msg, sizeof(msg), 0); // no special ruleto read
+if(read_b>0)
+        send(cfd, "hello", strlen(msg));
+	conytinue
+else return;
+
+}
+
+close(sfd);
+close(cfd);
+}
+
+#define PORT 8080
+main(){
+  int cfd = socket(AF_INET, SOCK_STREAM,IPPROTO_TCP/UDP0);
+  struct sockaddr_in saddr;
+  saddr.sin_family = AFINET;
+  saddr.sin_port = htons(port);
+  saadr.sin_addr.s_addr = INADDR_ANY; // inet_addr(127.0.0.1);
+
+  connect(cfd, saddr); // -1 error
+  while(1){
+	send(cfd, "hi", sizeof(msg), 0);
+        if(
+        sleep(1)
+        int read_b = recv(cfd, buffer, sizeof(buffer));
+        
+}
+close(cfd);
+}
